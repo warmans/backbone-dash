@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title></title>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+        <link href='http://fonts.googleapis.com/css?family=Oleo+Script+Swash+Caps|Squada+One' rel='stylesheet' type='text/css'>
+
+        <script src="http://code.jquery.com/jquery-1.10.1.min.js"></script>
+
+        <script src="//cdnjs.cloudflare.com/ajax/libs/underscore.js/1.5.2/underscore-min.js"></script>
+        <script src="//cdnjs.cloudflare.com/ajax/libs/backbone.js/1.1.0/backbone-min.js"></script>
+
+        <script src="js/jquery.gridster.min.js"></script>
+        <link rel="stylesheet" href="js/jquery.gridster.min.css" />
+
+        <script src="js/jquery.sparkline.min.js"></script>
+
+        <style>
+
+            body {
+                /*font-family: 'Oleo Script Swash Caps', cursive;*/
+                font-family: 'Squada One', cursive;
+                background-color : #333;
+                font-weight: bold;
+            }
+
+            .gridster li {
+                list-style: none;
+                text-align: center;
+                overflow : hidden;
+            }
+
+            .panel .metric_cur_val {
+                position: relative;
+                z-index: 100;
+                top : 0px;
+            }
+
+            .panel .metric_title {
+                background-color : #222;
+                height : 20px;
+                color : #fff;
+                opacity: 1;
+                font-weight: normal;
+            }
+
+            .panel .metric_prev_vals {
+                width : 100%;
+                height : 100%;
+                opacity: 0.5;
+            }
+
+            .panel.small .under {
+                position : relative;
+                z-index : 50;
+                width : 140px;
+                height : 140px;
+                top : -140px;
+            }
+
+            .panel.small .over {
+                position : relative;
+                z-index : 100;
+                height : 140px;
+                width : 140px;
+            }
+
+            .panel.small .metric_cur_val {
+                font-size : 2em;
+                line-height : 120px;
+            }
+
+            .panel.big .under {
+                position : relative;
+                z-index : 50;
+                width : 300px;
+                height : 300px;
+                top : -300px;
+            }
+
+            .panel.big .over {
+                position : relative;
+                z-index : 100;
+                height : 300px;
+                width : 300px;
+            }
+
+            .panel.big .metric_cur_val {
+                font-size : 4.5em;
+                line-height : 280px;
+            }
+        </style>
+    </head>
+    <body>
+
+        <script type="text/template" id="small_metric_view_tpl">
+            <div class="panel small" style="background-color: <%= background_color %>">
+                <div class="over">
+                    <div class="metric_cur_val">
+                        <%= value %>
+                    </div>
+                    <div class="metric_title"><%= title %></div>
+                </div>
+                <div class="under">
+                    <div class="metric_prev_vals sparklines" values="<%= history.join(',') %>"></div>
+                </div>
+            </div>
+        </script>
+
+        <script type="text/template" id="tall_metric_view_tpl">
+            <div class="panel tall">
+                <div class="over">
+                    <div class="metric_title"><%= title %></div>
+                    <div class="metric_cur_val">
+                        <%= value %>
+                    </div>
+                </div>
+                <div class="under">
+                    <div class="metric_prev_vals sparklines" values="<%= history.join(',') %>"></div>
+                </div>
+            </div>
+        </script>
+        <script type="text/template" id="fat_metric_view_tpl">
+            <div class="panel fat">
+                <div class="over">
+                    <div class="metric_title"><%= title %></div>
+                    <div class="metric_cur_val">
+                        <%= value %>
+                    </div>
+                </div>
+                <div class="under">
+                    <div class="metric_prev_vals sparklines" values="<%= history.join(',') %>"></div>
+                </div>
+            </div>
+        </script>
+        <script type="text/template" id="big_metric_view_tpl">
+            <div class="panel big" style="background-color: <%= background_color %>">
+                <div class="over">
+                    <div class="metric_cur_val">
+                        <%= value %>
+                    </div>
+                    <div class="metric_title"><%= title %></div>
+                </div>
+                <div class="under">
+                    <div class="metric_prev_vals sparklines" values="<%= history.join(',') %>"></div>
+                </div>
+            </div>
+        </script>
+
+        <script type="text/javascript">
+            $(document).ready (function(){
+                //load gridster
+                 var gridster = $(".gridster ul").gridster({
+                     widget_margins: [10, 10],
+                     widget_base_dimensions: [140, 140]
+                 }).data('gridster');
+
+                 /**
+                  * Metric Model
+                  */
+                Metric = Backbone.Model.extend({
+                    urlRoot: 'data.php',
+                    defaults: {
+                        id: 'first',
+                        col: 1,
+                        row: 1,
+                        sizex: 1,
+                        sizey: 1,
+                        value: 'NA',
+                        history: [],
+                        historyMax: 30,
+                        background_color: null,
+                        update_frequency: 5000
+                    },
+                    initialize: function(){
+
+                        var self = this;
+
+                        //set a colour if none already exists
+                        if (this.get('background_color') === null) {
+                            colours = ['#F0A30A', '#825A2C', '#0050EF', '#A20025', '#1BA1E2', '#D80073', '#A4C400', '#6A00FF', '#6D8764', '#FA6800', '#E51400', '#7A3B3F']
+                            this.set('background_color', colours[Math.floor(Math.random()*colours.length)]);
+                        }
+
+                        //setup listeners
+                        this.on('change:value', function(){
+                            //keep the last 5 values
+                            var history = this.get('history');
+                            if(history.length > this.get('historyMax')){
+                                history.shift();
+                            }
+                            if(this.get('value') !== 'NA'){
+                                history.push(this.get('value'));
+                            }
+                        });
+                        this.on('sync', function(){
+                            setTimeout(function(){ self.fetch(); }, self.get('update_frequency'));
+                        }, this);
+
+                        //start updates
+                        this.fetch();
+                    },
+                    createView: function(container) {
+                        if(this.get('sizex') == 1 && this.get('sizey') >= 2){
+                            return new TallMetricView({el: container, model: this})
+                        }
+                        if(this.get('sizex') >= 2 && this.get('sizey') == 1){
+                            return new TallMetricView({el: container, model: this})
+                        }
+                        if(this.get('sizex') == 2 && this.get('sizey') == 2){
+                            return new BigMetricView({el: container, model: this})
+                        }
+
+                        return new SmallMetricView({el: container, model: this})
+                    }
+                });
+
+                /**
+                * Metric Collection
+                */
+                MetricCollection = Backbone.Collection.extend({
+                    model: Metric
+                });
+
+              /**
+                *  Inner panel layout
+                */
+                SmallMetricView = Backbone.View.extend({
+                    render: function(){
+                        this.$el.html(_.template( $("#small_metric_view_tpl").html(), this.model.toJSON()));
+                    }
+                });
+
+              /**
+                *  Inner panel layout
+                */
+                TallMetricView = Backbone.View.extend({
+                    render: function(){
+                        this.$el.html(_.template( $("#tall_metric_view_tpl").html(), this.model.toJSON()));
+                    }
+                });
+
+              /**
+                *  Inner panel layout
+                */
+                FatMetricView = Backbone.View.extend({
+                    render: function(){
+                        this.$el.html(_.template( $("#fat_metric_view_tpl").html(), this.model.toJSON()));
+                    }
+                });
+
+              /**
+                *  Inner panel layout
+                */
+                BigMetricView = Backbone.View.extend({
+                    render: function(){
+                        this.$el.html(_.template( $("#big_metric_view_tpl").html(), this.model.toJSON()));
+                    }
+                });
+
+                /**
+                *  Layout
+                */
+                AppView = Backbone.View.extend({
+                    initialize: function(){
+                        metrics = this.collection.models;
+
+                        this.sub_views = [];
+                        _.each(metrics, function(metric){
+                            metric.on('change:value', this.render, this);
+
+                            //add initial panel container to page
+                            var el = gridster.add_widget('<li></li>', metric.get('sizex'), metric.get('sizey'));
+
+                            //bind panel to view and store reference for later
+                            this.sub_views.push(metric.createView(el));
+                        }, this);
+                    },
+                    render: function(){
+                        _.each(this.sub_views, function(sub_view){
+                            //add new
+                            sub_view.render();
+                            //do graphs
+                            $('.sparklines').sparkline('html', { type:'line', fillColor:'#fff', lineColor: '#fff', width : '100%', height : '100%', valueSpots: false, highlightSpotColor: false});
+                        }, this);
+
+                    }
+                });
+
+                //create metrics
+                var metrics = new MetricCollection;
+                metrics.push({id:'first', title:'foo', history:[]});
+                metrics.push({title:'foo', history:[]});
+                metrics.push({title:'some other value', sizey: 2, sizex:2, historyMax: 50, history:[]});
+
+                //render to dashboard
+                var dashboard = new AppView({
+                    el: $("#panels-container"),
+                    collection: metrics
+                });
+
+                //go
+                dashboard.render();
+
+            });
+        </script>
+
+        <div class="gridster">
+            <ul id="panels-container">
+
+            </ul>
+        </div>
+    </body>
+</html>
