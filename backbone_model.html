@@ -264,7 +264,7 @@
                 */
                 AppView = Backbone.View.extend({
                     initialize: function(){
-                        metrics = this.collection.models;
+                        var metrics = this.collection.models;
 
                         this.sub_views = [];
                         _.each(metrics, function(metric){
